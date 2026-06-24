@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>reading list</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --white: #ffffff;
+      --black: #000000;
+      --gray-1: #888888;
+      --gray-2: #cccccc;
+      --gray-3: #f2f2f2;
+      --font: 'IBM Plex Sans', -apple-system, sans-serif;
+    }
+
+    html {
+      font-size: 14px;
+    }
+
+    body {
+      font-family: var(--font);
+      font-weight: 300;
+      background: var(--white);
+      color: var(--black);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Layout ── */
+    .shell {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .header h1 {
+      font-weight: 300;
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      text-transform: lowercase;
+    }
+
+    .header .count {
+      font-size: 0.785rem;
+      color: var(--gray-1);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.857rem;
+      border: none;
+      border-bottom: 1px solid var(--gray-2);
+      padding: 6px 0;
+      outline: none;
+      background: transparent;
+      color: var(--black);
+      transition: border-color 0.15s;
+    }
+
+    .search-box::placeholder {
+      color: var(--gray-2);
+    }
+
+    .search-box:focus {
+      border-bottom-color: var(--black);
+    }
+
+    .domain-filter {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.785rem;
+      border: none;
+      border-bottom: 1px solid var(--gray-2);
+      padding: 6px 0;
+      background: transparent;
+      color: var(--black);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0 center;
+    }
+
+    .domain-filter:focus {
+      border-bottom-color: var(--black);
+    }
+
+    .folder-toggle {
+      display: flex;
+      gap: 0;
+      font-size: 0.785rem;
+    }
+
+    .folder-toggle button {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.785rem;
+      background: none;
+      border: none;
+      padding: 6px 12px;
+      cursor: pointer;
+      color: var(--gray-1);
+      border-bottom: 1px solid var(--gray-2);
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .folder-toggle button.active {
+      color: var(--black);
+      border-bottom-color: var(--black);
+    }
+
+    .folder-toggle button:hover {
+      color: var(--black);
+    }
+
+    /* ── List ── */
+    .list {
+      border-top: 1px solid var(--gray-3);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--gray-3);
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+
+    .row:hover {
+      background: var(--gray-3);
+      margin: 0 -8px;
+      padding: 10px 8px;
+    }
+
+    .row-left {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .row-title {
+      font-weight: 300;
+      font-size: 0.928rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+
+    .row.is-read .row-title {
+      color: var(--gray-1);
+    }
+
+    .row-domain {
+      font-size: 0.785rem;
+      color: var(--gray-1);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .row-right {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      white-space: nowrap;
+    }
+
+    .row-date {
+      font-size: 0.714rem;
+      color: var(--gray-2);
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .row-action {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.714rem;
+      background: none;
+      border: none;
+      color: var(--gray-2);
+      cursor: pointer;
+      padding: 2px 0;
+      transition: color 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .row-action:hover {
+      color: var(--black);
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      padding: 48px 0;
+      text-align: center;
+      color: var(--gray-2);
+      font-size: 0.857rem;
+    }
+
+    /* ── Loading ── */
+    .loading {
+      padding: 48px 0;
+      text-align: center;
+      color: var(--gray-2);
+      font-size: 0.785rem;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .shell {
+        padding: 24px 16px 64px;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .row-left {
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .row-right {
+        gap: 12px;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <h1>reading list</h1>
+      <span class="count" id="count"></span>
+    </div>
+
+    <div class="controls">
+      <input
+        type="text"
+        class="search-box"
+        id="search"
+        placeholder="search titles, domains…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <select class="domain-filter" id="domainFilter">
+        <option value="">all domains</option>
+      </select>
+      <div class="folder-toggle">
+        <button class="active" data-folder="Unread">unread</button>
+        <button data-folder="Archive">archive</button>
+        <button data-folder="all">all</button>
+      </div>
+    </div>
+
+    <div id="list" class="list">
+      <div class="loading">loading…</div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- Option A: Firebase Hosting auto-config (works when deployed) -->
+  <script src="/__/firebase/init.js" onerror="console.log('Not on Firebase Hosting — using local config')"></script>
+
+  <!-- Option B: Local config for dev (gitignored) -->
+  <script src="/config.js" onerror="console.log('No local config.js found')"></script>
+
+  <script>
+    // Firebase auto-init already called if hosted on Firebase.
+    // If running locally, config.js defines window.FIREBASE_CONFIG and we init here.
+    if (!firebase.apps.length && window.FIREBASE_CONFIG) {
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+    } else if (!firebase.apps.length) {
+      document.getElementById('list').innerHTML =
+        '<div class="empty">missing firebase config — add config.js or deploy to firebase hosting</div>';
+      throw new Error('No Firebase config found');
+    }
+    const db = firebase.firestore();
+
+    // ─── State ─────────────────────────────────────────────
+    let allLinks = [];
+    let activeFolder = 'Unread';
+    let searchTerm = '';
+    let domainFilter = '';
+
+    // ─── Fetch ─────────────────────────────────────────────
+    async function fetchLinks() {
+      const snapshot = await db.collection('links')
+        .orderBy('savedAt', 'desc')
+        .get();
+
+      allLinks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        savedAt: doc.data().savedAt?.toDate?.() || new Date()
+      }));
+
+      buildDomainFilter();
+      render();
+    }
+
+    // ─── Domain Filter Dropdown ────────────────────────────
+    function buildDomainFilter() {
+      const counts = {};
+      allLinks.forEach(link => {
+        const d = link.domain || extractDomain(link.url);
+        counts[d] = (counts[d] || 0) + 1;
+      });
+
+      const sorted = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1]);
+
+      const select = document.getElementById('domainFilter');
+      select.innerHTML = '<option value="">all domains</option>';
+      sorted.forEach(([domain, count]) => {
+        const opt = document.createElement('option');
+        opt.value = domain;
+        opt.textContent = `${domain} (${count})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function extractDomain(url) {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        return url;
+      }
+    }
+
+    // ─── Render ────────────────────────────────────────────
+    function render() {
+      const filtered = allLinks.filter(link => {
+        // folder filter
+        if (activeFolder === 'Unread' && link.folder !== 'Unread') return false;
+        if (activeFolder === 'Archive' && link.folder !== 'Archive') return false;
+
+        // search
+        if (searchTerm) {
+          const q = searchTerm.toLowerCase();
+          const title = (link.title || '').toLowerCase();
+          const domain = (link.domain || '').toLowerCase();
+          if (!title.includes(q) && !domain.includes(q)) return false;
+        }
+
+        // domain
+        if (domainFilter) {
+          const d = link.domain || extractDomain(link.url);
+          if (d !== domainFilter) return false;
+        }
+
+        return true;
+      });
+
+      // update count
+      document.getElementById('count').textContent =
+        `${filtered.length} link${filtered.length !== 1 ? 's' : ''}`;
+
+      const container = document.getElementById('list');
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty">nothing here</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(link => {
+        const domain = link.domain || extractDomain(link.url);
+        const date = formatDate(link.savedAt);
+        const readClass = link.isRead ? ' is-read' : '';
+        const actionLabel = link.isRead ? 'mark unread' : 'mark read';
+
+        return `
+          <div class="row${readClass}" data-id="${link.id}">
+            <div class="row-left">
+              <span class="row-title">${escapeHtml(link.title || domain)}</span>
+              <span class="row-domain">${escapeHtml(domain)}</span>
+            </div>
+            <div class="row-right">
+              <span class="row-date">${date}</span>
+              <button class="row-action" onclick="event.stopPropagation(); toggleRead('${link.id}')">${actionLabel}</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // click rows to open link
+      container.querySelectorAll('.row').forEach(row => {
+        row.addEventListener('click', () => {
+          const id = row.dataset.id;
+          const link = allLinks.find(l => l.id === id);
+          if (link) window.open(link.url, '_blank', 'noopener');
+        });
+      });
+    }
+
+    function formatDate(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '—';
+      const now = new Date();
+      const diff = now - date;
+      const days = Math.floor(diff / 86400000);
+
+      if (days === 0) return 'today';
+      if (days === 1) return 'yesterday';
+      if (days < 30) return `${days}d ago`;
+
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      }).toLowerCase();
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ─── Toggle Read ───────────────────────────────────────
+    async function toggleRead(id) {
+      const link = allLinks.find(l => l.id === id);
+      if (!link) return;
+
+      const newIsRead = !link.isRead;
+      const newFolder = newIsRead ? 'Archive' : 'Unread';
+
+      try {
+        await db.collection('links').doc(id).update({
+          isRead: newIsRead,
+          folder: newFolder
+        });
+
+        link.isRead = newIsRead;
+        link.folder = newFolder;
+        render();
+      } catch (err) {
+        console.error('Write failed — check Firestore rules:', err);
+      }
+    }
+
+    // ─── Event Listeners ───────────────────────────────────
+    document.getElementById('search').addEventListener('input', (e) => {
+      searchTerm = e.target.value.trim();
+      render();
+    });
+
+    document.getElementById('domainFilter').addEventListener('change', (e) => {
+      domainFilter = e.target.value;
+      render();
+    });
+
+    document.querySelectorAll('.folder-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.folder-toggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFolder = btn.dataset.folder;
+        render();
+      });
+    });
+
+    // keyboard shortcut: / to focus search
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== document.getElementById('search')) {
+        e.preventDefault();
+        document.getElementById('search').focus();
+      }
+    });
+
+    // ─── Init ──────────────────────────────────────────────
+    fetchLinks();
+  </script>
+</body>
+</html>
