@@ -296,9 +296,8 @@
         <option value="">all domains</option>
       </select>
       <div class="folder-toggle">
-        <button class="active" data-folder="Unread">unread</button>
         <button data-folder="Archive">archive</button>
-        <button data-folder="all">all</button>
+        <button class="active" data-folder="all">all</button>
       </div>
     </div>
 
@@ -331,7 +330,7 @@
 
     // ─── State ─────────────────────────────────────────────
     let allLinks = [];
-    let activeFolder = 'Unread';
+    let activeFolder = 'all';
     let searchTerm = '';
     let domainFilter = '';
 
@@ -384,7 +383,6 @@
     function render() {
       const filtered = allLinks.filter(link => {
         // folder filter
-        if (activeFolder === 'Unread' && link.folder !== 'Unread') return false;
         if (activeFolder === 'Archive' && link.folder !== 'Archive') return false;
 
         // search
@@ -418,18 +416,14 @@
       container.innerHTML = filtered.map(link => {
         const domain = link.domain || extractDomain(link.url);
         const date = formatDate(link.savedAt);
-        const readClass = link.isRead ? ' is-read' : '';
-        const actionLabel = link.isRead ? 'mark unread' : 'mark read';
-
         return `
-          <div class="row${readClass}" data-id="${link.id}">
+          <div class="row" data-id="${link.id}">
             <div class="row-left">
               <span class="row-title">${escapeHtml(link.title || domain)}</span>
               <span class="row-domain">${escapeHtml(domain)}</span>
             </div>
             <div class="row-right">
               <span class="row-date">${date}</span>
-              <button class="row-action" onclick="event.stopPropagation(); toggleRead('${link.id}')">${actionLabel}</button>
             </div>
           </div>
         `;
@@ -466,28 +460,6 @@
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
-    }
-
-    // ─── Toggle Read ───────────────────────────────────────
-    async function toggleRead(id) {
-      const link = allLinks.find(l => l.id === id);
-      if (!link) return;
-
-      const newIsRead = !link.isRead;
-      const newFolder = newIsRead ? 'Archive' : 'Unread';
-
-      try {
-        await db.collection('links').doc(id).update({
-          isRead: newIsRead,
-          folder: newFolder
-        });
-
-        link.isRead = newIsRead;
-        link.folder = newFolder;
-        render();
-      } catch (err) {
-        console.error('Write failed — check Firestore rules:', err);
-      }
     }
 
     // ─── Event Listeners ───────────────────────────────────
