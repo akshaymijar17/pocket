@@ -231,6 +231,78 @@
       color: var(--black);
     }
 
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.18);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--white);
+      border: 1px solid var(--gray-2);
+      padding: 28px 32px;
+      max-width: 360px;
+      width: 100%;
+      margin: 0 16px;
+    }
+
+    .modal p {
+      font-size: 0.857rem;
+      font-weight: 300;
+      margin-bottom: 20px;
+      line-height: 1.5;
+      color: var(--black);
+    }
+
+    .modal-title {
+      font-size: 0.714rem;
+      color: var(--gray-1);
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .modal-actions button {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.785rem;
+      background: none;
+      border: 1px solid var(--gray-2);
+      padding: 6px 16px;
+      cursor: pointer;
+      color: var(--black);
+      transition: border-color 0.15s, color 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .modal-actions button:hover {
+      border-color: var(--black);
+    }
+
+    .modal-actions .btn-delete {
+      border-color: var(--black);
+      background: var(--black);
+      color: var(--white);
+    }
+
+    .modal-actions .btn-delete:hover {
+      background: #333;
+    }
+
     /* ── Empty state ── */
     .empty {
       padding: 48px 0;
@@ -246,6 +318,41 @@
       color: var(--gray-2);
       font-size: 0.785rem;
       letter-spacing: 0.04em;
+    }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0 0;
+      font-size: 0.714rem;
+      color: var(--gray-1);
+      letter-spacing: 0.02em;
+    }
+
+    .pagination button {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.714rem;
+      background: none;
+      border: none;
+      color: var(--black);
+      cursor: pointer;
+      padding: 4px 0;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid var(--gray-2);
+      transition: border-color 0.15s;
+    }
+
+    .pagination button:hover {
+      border-bottom-color: var(--black);
+    }
+
+    .pagination button:disabled {
+      color: var(--gray-2);
+      cursor: default;
+      border-bottom-color: transparent;
     }
 
     /* ── Mobile ── */
@@ -301,6 +408,17 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="deleteModal">
+      <div class="modal">
+        <div class="modal-title">delete link</div>
+        <p id="deleteModalTitle"></p>
+        <div class="modal-actions">
+          <button onclick="closeDeleteModal()">cancel</button>
+          <button class="btn-delete" onclick="confirmDelete()">delete</button>
+        </div>
+      </div>
+    </div>
+
     <div id="list" class="list">
       <div class="loading">loading…</div>
     </div>
@@ -333,6 +451,8 @@
     let activeFolder = 'all';
     let searchTerm = '';
     let domainFilter = '';
+    let currentPage = 0;
+    const PAGE_SIZE = 50;
 
     // ─── Fetch ─────────────────────────────────────────────
     async function fetchLinks() {
@@ -402,7 +522,10 @@
         return true;
       });
 
-      // update count
+      const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+      if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+      const page = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
       document.getElementById('count').textContent =
         `${filtered.length} link${filtered.length !== 1 ? 's' : ''}`;
 
@@ -413,7 +536,7 @@
         return;
       }
 
-      container.innerHTML = filtered.map(link => {
+      container.innerHTML = page.map(link => {
         const domain = link.domain || extractDomain(link.url);
         const date = formatDate(link.savedAt);
         return `
@@ -424,10 +547,24 @@
             </div>
             <div class="row-right">
               <span class="row-date">${date}</span>
+              <button class="row-action" onclick="event.stopPropagation(); openDeleteModal('${link.id}')">delete</button>
             </div>
           </div>
         `;
       }).join('');
+
+      if (totalPages > 1) {
+        const pager = document.createElement('div');
+        pager.className = 'pagination';
+        pager.innerHTML = `
+          <button id="pgPrev" ${currentPage === 0 ? 'disabled' : ''}>← prev</button>
+          <span>${currentPage + 1} / ${totalPages}</span>
+          <button id="pgNext" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>next →</button>
+        `;
+        container.appendChild(pager);
+        document.getElementById('pgPrev').addEventListener('click', () => { currentPage--; render(); window.scrollTo(0,0); });
+        document.getElementById('pgNext').addEventListener('click', () => { currentPage++; render(); window.scrollTo(0,0); });
+      }
 
       // click rows to open link
       container.querySelectorAll('.row').forEach(row => {
@@ -462,14 +599,50 @@
       return div.innerHTML;
     }
 
+    // ─── Delete Modal ──────────────────────────────────────
+    let pendingDeleteId = null;
+
+    function openDeleteModal(id) {
+      const link = allLinks.find(l => l.id === id);
+      if (!link) return;
+      pendingDeleteId = id;
+      document.getElementById('deleteModalTitle').textContent = link.title || link.domain || link.url;
+      document.getElementById('deleteModal').classList.add('open');
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteId = null;
+      document.getElementById('deleteModal').classList.remove('open');
+    }
+
+    async function confirmDelete() {
+      if (!pendingDeleteId) return;
+      const id = pendingDeleteId;
+      closeDeleteModal();
+      try {
+        await db.collection('links').doc(id).delete();
+        allLinks = allLinks.filter(l => l.id !== id);
+        buildDomainFilter();
+        render();
+      } catch (err) {
+        console.error('Delete failed:', err);
+      }
+    }
+
+    document.getElementById('deleteModal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeDeleteModal();
+    });
+
     // ─── Event Listeners ───────────────────────────────────
     document.getElementById('search').addEventListener('input', (e) => {
       searchTerm = e.target.value.trim();
+      currentPage = 0;
       render();
     });
 
     document.getElementById('domainFilter').addEventListener('change', (e) => {
       domainFilter = e.target.value;
+      currentPage = 0;
       render();
     });
 
@@ -478,6 +651,7 @@
         document.querySelectorAll('.folder-toggle button').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeFolder = btn.dataset.folder;
+        currentPage = 0;
         render();
       });
     });
