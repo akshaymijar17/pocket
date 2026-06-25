@@ -25,8 +25,9 @@ Built in an afternoon with Claude.
 - Cloud Firestore (database)
 - Cloud Functions (Telegram webhook + async title enricher)
 - Telegram Bot API (input layer)
-- Vanilla JS
-  
+<<<<<<< HEAD
+- Vanilla JS — no framework, no build step
+
 ## Design
 
-Minimalist white/black interface. IBM Plex Sans Light. Flat rows with hairline separators.
+Minimalist white/black interface. IBM Plex Sans Light. Flat rows with hairline separators. No cards, no shadows, no thumbnails. A reading list, not a feed.
