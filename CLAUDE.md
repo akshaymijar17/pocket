@@ -29,7 +29,7 @@ Collection: `links/{auto-id}`
   "title": "string — page title (falls back to domain if fetch fails)",
   "domain": "string — extracted hostname, e.g. 'nytimes.com'",
   "savedAt": "timestamp — when it was saved",
-  "source": "'import' | 'telegram' | 'manual'",
+  "source": "'import' | 'telegram' | 'agent' | 'manual'",
   "folder": "'Unread' | 'Archive'",
   "isRead": "boolean — true if folder === 'Archive'",
   "tags": "string[] — empty for now"
@@ -53,9 +53,19 @@ allow write: if true;
 - Bot token stored as Firebase secret: `TELEGRAM_BOT_TOKEN`
 - Auth: allows unauthenticated invocations (required for Telegram webhook)
 
+### addLink (HTTP, 2nd Gen)
+- Add-only ingest API for personal agents (e.g. Muse)
+- `POST` JSON `{ "url": "...", "title": "optional" }`
+- Requires `Authorization: Bearer <INGEST_TOKEN>` header (constant-time check)
+- Shared secret stored as Firebase secret: `INGEST_TOKEN`
+- Validates URL (must be http/https), writes to Firestore with `source: "agent"`, domain as temporary title (unless a title is provided)
+- Can only create links — never reads, updates, or deletes. Rotate `INGEST_TOKEN` to revoke.
+- Returns `{ ok: true, id }` on success; 401 on bad token, 400 on bad input
+- Auth: allows unauthenticated invocations (token check is in-code, not IAM)
+
 ### enrichLink (Firestore-triggered, 2nd Gen)
 - Fires on `links/{linkId}` document creation
-- Only processes documents where `source === "telegram"` and `title === domain`
+- Only processes documents where `source === "telegram"` or `source === "agent"`, and `title === domain`
 - Fetches page title using Node 20 native `fetch` with 10s abort timeout
 - Updates the document's `title` field
 - Decodes HTML entities in titles
