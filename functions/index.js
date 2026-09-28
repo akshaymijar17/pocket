@@ -3,11 +3,13 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { URL } = require("url");
+const crypto = require("crypto");
 
 admin.initializeApp();
 const db = admin.firestore();
 
 const BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
+const INGEST_TOKEN = defineSecret("INGEST_TOKEN");
 
 // ── Webhook — fast, no outbound HTTP ─────────────────────
 
@@ -47,6 +49,78 @@ exports.telegramWebhook = onRequest(
   }
 );
 
+// ── Agent ingest — add-only API for personal agents ─────
+//
+// Any agent (e.g. Muse) can add a link by POSTing:
+//   POST https://<region>-<project>.cloudfunctions.net/addLink
+//   Authorization: Bearer <INGEST_TOKEN>
+//   Content-Type: application/json
+//   { "url": "https://example.com/article", "title": "optional" }
+//
+// This surface is add-only: it can create links but never read,
+// update, or delete them. Rotate INGEST_TOKEN to revoke access.
+
+exports.addLink = onRequest(
+  { secrets: [INGEST_TOKEN], region: "us-central1", cors: false },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "method not allowed" });
+    }
+
+    if (!tokenIsValid(req.get("authorization"), INGEST_TOKEN.value())) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+
+    const rawUrl = typeof req.body?.url === "string" ? req.body.url.trim() : "";
+    if (!rawUrl) {
+      return res.status(400).json({ error: "missing url" });
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch (err) {
+      return res.status(400).json({ error: "invalid url" });
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return res.status(400).json({ error: "url must be http(s)" });
+    }
+
+    const domain = parsed.hostname.replace(/^www\./, "");
+    const providedTitle =
+      typeof req.body?.title === "string" ? req.body.title.trim() : "";
+
+    try {
+      const ref = await db.collection("links").add({
+        url: parsed.href,
+        title: providedTitle || domain,
+        domain,
+        savedAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: "agent",
+        folder: "Unread",
+        isRead: false,
+        tags: [],
+      });
+      return res.status(200).json({ ok: true, id: ref.id });
+    } catch (err) {
+      console.error("addLink save failed:", err);
+      return res.status(500).json({ error: "save failed" });
+    }
+  }
+);
+
+// Constant-time bearer-token check. Rejects unless the header is
+// exactly "Bearer <token>" and matches the configured secret.
+function tokenIsValid(authHeader, expected) {
+  if (!authHeader || !expected) return false;
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!m) return false;
+  const provided = Buffer.from(m[1]);
+  const secret = Buffer.from(expected);
+  if (provided.length !== secret.length) return false;
+  return crypto.timingSafeEqual(provided, secret);
+}
+
 // ── Enricher — runs async after document is created ──────
 
 exports.enrichLink = onDocumentCreated(
@@ -56,7 +130,8 @@ exports.enrichLink = onDocumentCreated(
     if (!snap) return;
 
     const data = snap.data();
-    if (data.source !== "telegram" || data.title !== data.domain) return;
+    const enrichable = data.source === "telegram" || data.source === "agent";
+    if (!enrichable || data.title !== data.domain) return;
 
     const title = await fetchTitle(data.url);
     if (title && title !== data.domain) {
