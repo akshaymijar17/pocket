@@ -1,5 +1,0 @@
-public/config.js
-import/serviceAccountKey.json
-node_modules/
-.firebase/
-.DS_Store

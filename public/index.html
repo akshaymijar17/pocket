@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>reading list</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -147,6 +148,69 @@
 
     .folder-toggle button:hover {
       color: var(--black);
+    }
+
+    /* ── Add bar ── */
+    .add-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .add-input {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.857rem;
+      border: none;
+      border-bottom: 1px solid var(--gray-2);
+      padding: 6px 0;
+      outline: none;
+      background: transparent;
+      color: var(--black);
+      transition: border-color 0.15s;
+    }
+
+    .add-input::placeholder {
+      color: var(--gray-2);
+    }
+
+    .add-input:focus {
+      border-bottom-color: var(--black);
+    }
+
+    .add-input.add-error {
+      border-bottom-color: var(--black);
+    }
+
+    .add-input.add-error::placeholder {
+      color: var(--black);
+    }
+
+    .add-btn {
+      font-family: var(--font);
+      font-weight: 300;
+      font-size: 0.785rem;
+      background: none;
+      border: 1px solid var(--gray-2);
+      padding: 6px 16px;
+      cursor: pointer;
+      color: var(--black);
+      transition: border-color 0.15s, color 0.15s;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+
+    .add-btn:hover {
+      border-color: var(--black);
+    }
+
+    .add-btn:disabled {
+      color: var(--gray-2);
+      border-color: var(--gray-2);
+      cursor: default;
     }
 
     /* ── List ── */
@@ -389,6 +453,19 @@
       <h1>reading list</h1>
       <span class="count" id="count"></span>
     </div>
+
+    <form class="add-bar" id="addForm">
+      <input
+        type="text"
+        class="add-input"
+        id="addInput"
+        placeholder="paste a url to add…"
+        autocomplete="off"
+        spellcheck="false"
+        inputmode="url"
+      >
+      <button type="submit" class="add-btn" id="addBtn">add</button>
+    </form>
 
     <div class="controls">
       <input
@@ -661,6 +738,114 @@
       if (e.key === '/' && document.activeElement !== document.getElementById('search')) {
         e.preventDefault();
         document.getElementById('search').focus();
+      }
+    });
+
+    // ─── Add Link ──────────────────────────────────────────
+    const addForm = document.getElementById('addForm');
+    const addInput = document.getElementById('addInput');
+    const addBtn = document.getElementById('addBtn');
+    const ADD_PLACEHOLDER = 'paste a url to add…';
+    let flashTimer = null;
+
+    // Normalize pasted input into a http(s) URL. Bare domains
+    // (e.g. "nytimes.com/article") get an https:// prefix.
+    function normalizeUrl(raw) {
+      let s = (raw || '').trim();
+      if (!s) return null;
+      if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+      let u;
+      try {
+        u = new URL(s);
+      } catch {
+        return null;
+      }
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      if (!u.hostname.includes('.')) return null;
+      return u;
+    }
+
+    function flashAdd(msg) {
+      addInput.placeholder = msg;
+      addInput.classList.add('add-error');
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => {
+        addInput.placeholder = ADD_PLACEHOLDER;
+        addInput.classList.remove('add-error');
+      }, 2200);
+    }
+
+    // After adding, the enricher fetches the real page title in
+    // the background. Listen briefly so the title updates live
+    // without a page reload.
+    function watchForTitle(id, domain) {
+      const unsub = db.collection('links').doc(id).onSnapshot(snap => {
+        const data = snap.data();
+        if (!data) return;
+        const local = allLinks.find(l => l.id === id);
+        if (local && data.title && data.title !== local.title) {
+          local.title = data.title;
+          render();
+        }
+        if (data.title && data.title !== domain) stop();
+      });
+      const timer = setTimeout(stop, 30000);
+      function stop() {
+        clearTimeout(timer);
+        unsub();
+      }
+    }
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const parsed = normalizeUrl(addInput.value);
+      if (!parsed) {
+        addInput.value = '';
+        flashAdd('invalid url');
+        return;
+      }
+
+      const domain = parsed.hostname.replace(/^www\./, '');
+      addBtn.disabled = true;
+      const prevLabel = addBtn.textContent;
+      addBtn.textContent = 'adding…';
+
+      try {
+        const ref = await db.collection('links').add({
+          url: parsed.href,
+          title: domain,
+          domain,
+          savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          source: 'manual',
+          folder: 'Unread',
+          isRead: false,
+          tags: []
+        });
+
+        // Optimistically show it at the top of the list.
+        allLinks.unshift({
+          id: ref.id,
+          url: parsed.href,
+          title: domain,
+          domain,
+          savedAt: new Date(),
+          source: 'manual',
+          folder: 'Unread',
+          isRead: false,
+          tags: []
+        });
+
+        addInput.value = '';
+        currentPage = 0;
+        buildDomainFilter();
+        render();
+        watchForTitle(ref.id, domain);
+      } catch (err) {
+        console.error('Add failed:', err);
+        flashAdd('add failed — try again');
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = prevLabel;
       }
     });
 
