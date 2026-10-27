@@ -67,3 +67,10 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# macOS
+.DS_Store
+
+# Secrets and local-only config — NEVER commit
+import/serviceAccountKey.json
+public/config.js
