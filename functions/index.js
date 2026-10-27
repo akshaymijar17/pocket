@@ -130,7 +130,12 @@ exports.enrichLink = onDocumentCreated(
     if (!snap) return;
 
     const data = snap.data();
-    const enrichable = data.source === "telegram" || data.source === "agent";
+    // telegram, agent, and manual (frontend "add") links arrive
+    // with domain as a placeholder title; fetch their real title.
+    const enrichable =
+      data.source === "telegram" ||
+      data.source === "agent" ||
+      data.source === "manual";
     if (!enrichable || data.title !== data.domain) return;
 
     const title = await fetchTitle(data.url);

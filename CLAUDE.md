@@ -65,7 +65,7 @@ allow write: if true;
 
 ### enrichLink (Firestore-triggered, 2nd Gen)
 - Fires on `links/{linkId}` document creation
-- Only processes documents where `source === "telegram"` or `source === "agent"`, and `title === domain`
+- Only processes documents where `source === "telegram"`, `source === "agent"`, or `source === "manual"`, and `title === domain`
 - Fetches page title using Node 20 native `fetch` with 10s abort timeout
 - Updates the document's `title` field
 - Decodes HTML entities in titles
@@ -76,6 +76,7 @@ The webhook and enricher were originally one function, but outbound HTTP from Cl
 ## Frontend
 - Single `index.html` with inline CSS/JS
 - Flat list layout — no cards, no thumbnails, registry/ledger aesthetic
+- Add-a-link bar: paste a URL (bare domains get `https://` prepended) and it writes directly to Firestore client-side with `source: "manual"` and domain as a temporary title — no Telegram/Muse bot needed. The `enrichLink` function then backfills the real title, and the frontend listens briefly to update it live.
 - **IBM Plex Sans Light (300)** typeface, white/black minimalist interface
 - Search across title and domain (real-time filtering)
 - Domain filter dropdown (sorted by frequency)
